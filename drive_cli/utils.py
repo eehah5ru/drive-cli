@@ -79,7 +79,7 @@ def drive_data(*argv):
     return data
 
 
-def get_request(service, fid, mimeType):
+def get_request(service, fid, mimeType, ftype=False):
     if(re.match('^application/vnd\.google-apps\..+', mimeType)):
         if(mimeType == 'application/vnd.google-apps.document'):
             mimeTypes = {extension: mime.guess_type("placeholder_filename." + extension)[0] for extension
@@ -133,6 +133,17 @@ def get_request(service, fid, mimeType):
         options = [x for x in mimeTypes.keys()]
         picker = Picker(options, title, indicator='=>', default_index=0)
         picker.register_custom_handler(ord('s'), go_back)
+        #
+        # if format was set explicitly make request usin it
+        #
+        if ftype:
+            request = service.files().export_media(
+                fileId=fid, mimeType=mimeTypes[ftype])
+            return request, str("." + ftype)
+
+        #
+        # start picker...
+        #
         chosen, index = picker.start()
         if index != -1:
             request = service.files().export_media(
@@ -335,14 +346,14 @@ def file_download(item, cwd, clone=False):
     click.secho("completed download of " + fname, fg='yellow')
 
 
-def concat(fid):
+def concat(fid, ftype):
     token = os.path.join(dirpath, 'token.json')
     store = file.Storage(token)
     creds = store.get()
     service = build('drive', 'v3', http=creds.authorize(Http()))
     fh = io.BytesIO()
     item = get_file(fid)
-    request, ext = get_request(service, fid, item['mimeType'])
+    request, ext = get_request(service, fid, item['mimeType'], ftype)
     downloader = MediaIoBaseDownload(fh, request)
     done = False
     while done is False:

@@ -250,12 +250,13 @@ def list_out():
 
 
 @click.command('cat', short_help='view contents of the file using its file id or sharing link')
+@click.option('--ftype', default=False, help='force use specified format to export documents')
 @click.argument('link')
-def view(link):
+def view(link, ftype):
     cwd = os.getcwd()
     utils.save_history([{}, link, cwd])
     fid = utils.get_fid(link)
-    utils.concat(fid)
+    utils.concat(fid, ftype)
 
 
 @click.command('status', short_help='list changes committed since last sync')
