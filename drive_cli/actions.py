@@ -121,7 +121,7 @@ def batch_view_file(name, types, pid):
     #         query += " and "
     #     query += "'" + fid + "' in parents"
     csv_writer = csv.writer(sys.stdout)
-    csv_writer.writerow(['Sr.', 'Name', 'ID', 'Type', 'Modified Time'])
+    csv_writer.writerow(['Name', 'ID', 'Type', 'Modified Time'])
     i = 1
     while True:
         response = service.files().list(q=query,
