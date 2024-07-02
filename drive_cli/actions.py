@@ -1,6 +1,7 @@
 from . import utils
 import os
 import sys
+import csv
 import click
 from pick import Picker
 from httplib2 import Http
@@ -15,7 +16,139 @@ dirpath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(dirpath)
 mime = MimeTypes()
 
+#
+#
+# BATCH VIEW FILES
+#
+#
 
+#
+# BATCH VIEW CMD
+#
+@click.command('batch-view-files', short_help='batch filter search files and file ID for files user has access to')
+@click.option('--name', is_flag=bool, help='filter by name')
+@click.option('--types', is_flag=bool, help='filter by type')
+# @click.option('--pid', help='provide parent file ID or sharing link and list its child file/folders.')
+@click.argument('pid')
+def batch_view_file(name, types, pid):
+    """
+    view-files: Filter based list of the names and ids of the first 10 files the user has access to
+    """
+    cwd = os.getcwd()
+    flags = {"--name": [None], "--types": [None], "--pid": [None]}
+    token = os.path.join(dirpath, 'token.json')
+    store = file.Storage(token)
+    creds = store.get()
+    service = build('drive', 'v3', http=creds.authorize(Http()))
+    page_token = None
+    query = ""
+    if name:
+        q_name = click.prompt('enter the search value')
+        flags["--name"] = [q_name]
+        query = "name contains '" + q_name + "' "
+    if types:
+        mimeTypes = {extension: mime.guess_type("placeholder_filename." + extension)[0] for extension
+                     in ("xls",
+                         "xlsx",
+                         "xml",
+                         "ods",
+                         "csv",
+                         "pdf",
+                         "jpg",
+                         "png",
+                         "gif",
+                         "bmp",
+                         "txt",
+                         "doc",
+                         "js",
+                         "swf",
+                         "mp3",
+                         "zip",
+                         "rar",
+                         "tar",
+                         "cab",
+                         "html",
+                         "htm")}
+        mimeTypes.update({'tmpl': 'text/plain',
+                          'php': 'application/x-httpd-php',
+                          'arj': 'application/arj',
+                          "default": 'application/octet-stream',
+                          "audio": 'application/vnd.google-apps.audio',
+                          "Google Docs": 'application/vnd.google-apps.document',
+                          "Google Drawing": 'application/vnd.google-apps.drawing',
+                          "Google Drive file": 'application/vnd.google-apps.file',
+                          "Google Forms": 'application/vnd.google-apps.form',
+                          "Google Fusion Tables": 'application/vnd.google-apps.fusiontable',
+                          "Google My Maps": 'application/vnd.google-apps.map',
+                          "Google Photos": 'application/vnd.google-apps.photo',
+                          "Google Slides": 'application/vnd.google-apps.presentation',
+                          "Google Apps Scripts": 'application/vnd.google-apps.script',
+                          "Google Sites": 'application/vnd.google-apps.site',
+                          "Google Sheets": 'application/vnd.google-apps.spreadsheet',
+                          "3rd party shortcut": 'application/vnd.google-apps.drive-sdk',
+                          "folder": 'application/vnd.google-apps.folder'})
+        promptMessage = 'Choose a media type to filter \n(press SPACE to mark, ENTER to continue, s to stop):'
+        title = promptMessage
+        options = [x for x in mimeTypes.keys()]
+        picker = Picker(options, title, multi_select=True,
+                        min_selection_count=1)
+        picker.register_custom_handler(ord('s'), utils.go_back)
+        selected = picker.start()
+        option = []
+        if isinstance(selected, list):
+            query += "and ("
+            for types in selected:
+                query += "mimeType='" + mimeTypes[types[0]] + "' or "
+                option.append(types[0])
+            query = query[:-3]
+            query += ")"
+            flags["--types"] = option
+        if (not name) and types:
+            query = query[4:]
+    #
+    # pid processing
+    #
+    fid = utils.get_fid(pid)
+    if (name != False) or (types != False):
+        query += " and "
+    query += "'" + fid + "' in parents"
+
+    # if pid:
+    #     parent = click.prompt('enter the fid of parent or  sharing link')
+    #     flags["--pid"] = [parent]
+    #     fid = utils.get_fid(parent)
+    #     if (name != False) or (types != False):
+    #         query += " and "
+    #     query += "'" + fid + "' in parents"
+    csv_writer = csv.writer(sys.stdout)
+    csv_writer.writerow(['Sr.', 'Name', 'ID', 'Type', 'Modified Time'])
+    i = 1
+    while True:
+        response = service.files().list(q=query,
+                                        spaces='drive',
+                                        fields='nextPageToken, files(id, name,mimeType,modifiedTime)',
+                                        pageToken=page_token).execute()
+
+        templist = [response.get('files', [])[j:j + 25] for j in range(0, len(response.get('files', [])), 25)]
+
+        for item in templist:
+            for fils in item:
+                csv_writer.writerow([fils.get('name'), fils.get('id'), fils.get('mimeType'), fils.get('modifiedTime')])
+                i += 1
+        page_token = response.get('nextPageToken', None)
+        if page_token is None:
+            break
+    utils.save_history([flags, "", cwd])
+#
+# END OF BATCH-VIEW-FILES CMD
+#
+
+
+#
+#
+# original view-files cmd
+#
+#
 @click.command('view-files', short_help='filter search files and file ID for files user has access to')
 @click.option('--name', is_flag=bool, help='provide username in whose repos are to be listed.')
 @click.option('--types', is_flag=bool, help='provide username in whose repos are to be listed.')
@@ -124,6 +257,10 @@ def view_file(name, types, pid):
         if page_token is None:
             break
     utils.save_history([flags, "", cwd])
+#
+# END OF VIEW-FILES CMD
+#
+
 
 
 @click.command('clone', short_help='download any file using sharing link or file ID it will be automatically tracked henceforth')

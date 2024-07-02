@@ -16,6 +16,7 @@ def cli(remote):
 cli.add_command(auth.loggin)
 
 cli.add_command(actions.view_file)
+cli.add_command(actions.batch_view_file)
 
 cli.add_command(actions.download)
 
